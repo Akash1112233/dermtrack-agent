@@ -12,13 +12,14 @@ def build_consultation_graph(
     transcription_service: Any | None = None,
     vision_service: Any | None = None,
     triage_service: Any | None = None,
+    retrieval_service: Any | None = None,
 ):
     """Build and compile the consultation LangGraph workflow."""
 
     transcription = transcription_service
     vision = vision_service
     triage = triage_service or SafetyTriageService()
-
+    retrieval = retrieval_service
     def transcription_node(
         state: ConsultationState,
     ) -> ConsultationState:
@@ -76,6 +77,36 @@ def build_consultation_graph(
         )
 
         return updated_state
+    
+    def retrieval_node(
+        state: ConsultationState,
+    ) -> ConsultationState:
+        updated_state = dict(state)
+
+        query = state.get("transcript", "").strip()
+
+        if not query:
+            observation_text = " ".join(
+                observation.feature
+                for observation in state.get(
+                    "image_observations",
+                    [],
+                )
+            )
+            query = observation_text.strip()
+
+        if not query:
+            return updated_state
+
+        if retrieval is None:
+            return updated_state
+
+        updated_state["retrieved_sources"] = retrieval.retrieve(
+            query=query,
+            limit=4,
+        )
+
+        return updated_state
 
     builder = StateGraph(ConsultationState)
 
@@ -83,11 +114,13 @@ def build_consultation_graph(
     builder.add_node("transcription", transcription_node)
     builder.add_node("vision_analysis", vision_node)
     builder.add_node("safety_triage", triage_node)
+    builder.add_node("rag_retrieval", retrieval_node)
 
     builder.add_edge(START, "validate_input")
     builder.add_edge("validate_input", "transcription")
     builder.add_edge("transcription", "vision_analysis")
     builder.add_edge("vision_analysis", "safety_triage")
-    builder.add_edge("safety_triage", END)
+    builder.add_edge("safety_triage", "rag_retrieval")
+    builder.add_edge("rag_retrieval", END)
 
     return builder.compile()

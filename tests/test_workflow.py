@@ -2,6 +2,7 @@ from database.schemas import ImageObservation
 from agents.state import create_initial_state
 from agents.workflow import build_consultation_graph
 from services.triage_service import SafetyTriageService
+from database.schemas import ImageObservation, RetrievedSource
 
 class FakeTranscriptionService:
     def transcribe(self, audio_path):
@@ -55,3 +56,39 @@ def test_workflow_rejects_empty_consultation():
 
     assert len(result["errors"]) == 1
     assert "At least one consultation input is required" in result["errors"][0]
+
+
+class FakeRetrievalService:
+    def retrieve(self, query, limit=4):
+        assert "redness" in query.lower()
+        assert limit == 4
+
+        return [
+            RetrievedSource(
+                source_id="source_001::chunk::0",
+                title="Skin irritation guidance",
+                url="https://example.com/skin-guidance",
+                similarity_score=0.90,
+            )
+        ]
+    
+def test_workflow_adds_retrieved_sources():
+    graph = build_consultation_graph(
+        transcription_service=FakeTranscriptionService(),
+        vision_service=FakeVisionService(),
+        triage_service=SafetyTriageService(),
+        retrieval_service=FakeRetrievalService(),
+    )
+
+    state = create_initial_state(
+        patient_id="patient_001",
+        consultation_id="consultation_001",
+    )
+    state["audio_path"] = "data/demo/patient.wav"
+
+    result = graph.invoke(state)
+
+    assert len(result["retrieved_sources"]) == 1
+    assert result["retrieved_sources"][0].source_id == (
+        "source_001::chunk::0"
+    )

@@ -7,6 +7,7 @@ from agents.state import ConsultationState
 from services.gemini_vision import GeminiVisionService
 from services.groq_service import GroqTranscriptionService
 from services.triage_service import SafetyTriageService
+from database.schemas import Consultation
 
 def build_consultation_graph(
     transcription_service: Any | None = None,
@@ -14,7 +15,9 @@ def build_consultation_graph(
     triage_service: Any | None = None,
     retrieval_service: Any | None = None,
     response_service: Any | None = None,
+    consultation_repository: Any | None = None,
 ):
+
 
     """Build and compile the consultation LangGraph workflow."""
 
@@ -23,6 +26,7 @@ def build_consultation_graph(
     triage = triage_service or SafetyTriageService()
     retrieval = retrieval_service
     response = response_service
+    repository = consultation_repository
     def transcription_node(
         state: ConsultationState,
     ) -> ConsultationState:
@@ -134,6 +138,41 @@ def build_consultation_graph(
 
         return updated_state
 
+    def persistence_node(
+        state: ConsultationState,
+    ) -> ConsultationState:
+        updated_state = dict(state)
+
+        if repository is None:
+            return updated_state
+
+        triage = state.get("triage")
+        response_text = state.get("response_text", "").strip()
+
+        if triage is None or not response_text:
+            return updated_state
+
+        consultation = Consultation(
+            consultation_id=state["consultation_id"],
+            patient_id=state["patient_id"],
+            transcript=state.get("transcript", ""),
+            observations=state.get(
+                "image_observations",
+                [],
+            ),
+            triage=triage,
+            retrieved_sources=state.get(
+                "retrieved_sources",
+                [],
+            ),
+            response_text=response_text,
+        )
+
+        repository.create(consultation)
+
+        return updated_state
+
+
 
     builder = StateGraph(ConsultationState)
 
@@ -143,6 +182,7 @@ def build_consultation_graph(
     builder.add_node("safety_triage", triage_node)
     builder.add_node("rag_retrieval", retrieval_node)
     builder.add_node("response_generation", response_node)
+    builder.add_node("persistence", persistence_node)
 
     builder.add_edge(START, "validate_input")
     builder.add_edge("validate_input", "transcription")
@@ -150,6 +190,7 @@ def build_consultation_graph(
     builder.add_edge("vision_analysis", "safety_triage")
     builder.add_edge("safety_triage", "rag_retrieval")
     builder.add_edge("rag_retrieval", "response_generation")
-    builder.add_edge("response_generation", END)
+    builder.add_edge("response_generation", "persistence")
+    builder.add_edge("persistence", END)
 
     return builder.compile()

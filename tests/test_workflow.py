@@ -129,3 +129,47 @@ def test_workflow_generates_response_text():
 
     assert "localized redness" in result["response_text"]
     assert result["response_text"].strip() != ""
+
+class FakeConsultationRepository:
+    def __init__(self):
+        self.saved_consultations = []
+
+    def create(self, consultation):
+        self.saved_consultations.append(consultation)
+        return consultation
+
+def test_workflow_persists_completed_consultation():
+    consultation_repository = FakeConsultationRepository()
+
+    graph = build_consultation_graph(
+        transcription_service=FakeTranscriptionService(),
+        vision_service=FakeVisionService(),
+        triage_service=SafetyTriageService(),
+        response_service=FakeResponseService(),
+        consultation_repository=consultation_repository,
+    )
+
+    state = create_initial_state(
+        patient_id="patient_001",
+        consultation_id="consultation_001",
+    )
+    state["audio_path"] = "data/demo/patient.wav"
+    state["image_path"] = "data/demo/skin.jpg"
+
+    result = graph.invoke(state)
+
+    assert len(consultation_repository.saved_consultations) == 1
+
+    saved_consultation = (
+        consultation_repository.saved_consultations[0]
+    )
+
+    assert saved_consultation.consultation_id == (
+        "consultation_001"
+    )
+    assert saved_consultation.patient_id == "patient_001"
+    assert saved_consultation.transcript == (
+        "I have redness on my cheek."
+    )
+    assert saved_consultation.triage.risk_level == "low"
+    assert saved_consultation.response_text.strip() != ""

@@ -92,3 +92,40 @@ def test_workflow_adds_retrieved_sources():
     assert result["retrieved_sources"][0].source_id == (
         "source_001::chunk::0"
     )
+
+class FakeResponseService:
+    def generate(
+        self,
+        transcript,
+        observations,
+        triage,
+        sources,
+    ):
+        assert transcript == "I have redness on my cheek."
+        assert len(observations) == 1
+        assert triage.risk_level == "low"
+
+        return (
+            "Your description includes localized redness. "
+            "This is educational information, not a diagnosis."
+        )
+
+def test_workflow_generates_response_text():
+    graph = build_consultation_graph(
+        transcription_service=FakeTranscriptionService(),
+        vision_service=FakeVisionService(),
+        triage_service=SafetyTriageService(),
+        response_service=FakeResponseService(),
+    )
+
+    state = create_initial_state(
+        patient_id="patient_001",
+        consultation_id="consultation_001",
+    )
+    state["audio_path"] = "data/demo/patient.wav"
+    state["image_path"] = "data/demo/skin.jpg"
+
+    result = graph.invoke(state)
+
+    assert "localized redness" in result["response_text"]
+    assert result["response_text"].strip() != ""

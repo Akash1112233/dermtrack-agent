@@ -13,13 +13,16 @@ def build_consultation_graph(
     vision_service: Any | None = None,
     triage_service: Any | None = None,
     retrieval_service: Any | None = None,
+    response_service: Any | None = None,
 ):
+
     """Build and compile the consultation LangGraph workflow."""
 
     transcription = transcription_service
     vision = vision_service
     triage = triage_service or SafetyTriageService()
     retrieval = retrieval_service
+    response = response_service
     def transcription_node(
         state: ConsultationState,
     ) -> ConsultationState:
@@ -108,6 +111,30 @@ def build_consultation_graph(
 
         return updated_state
 
+    def response_node(
+        state: ConsultationState,
+    ) -> ConsultationState:
+        updated_state = dict(state)
+
+        if response is None:
+            return updated_state
+
+        updated_state["response_text"] = response.generate(
+            transcript=state.get("transcript", ""),
+            observations=state.get(
+                "image_observations",
+                [],
+            ),
+            triage=state.get("triage"),
+            sources=state.get(
+                "retrieved_sources",
+                [],
+            ),
+        )
+
+        return updated_state
+
+
     builder = StateGraph(ConsultationState)
 
     builder.add_node("validate_input", validate_input)
@@ -115,12 +142,14 @@ def build_consultation_graph(
     builder.add_node("vision_analysis", vision_node)
     builder.add_node("safety_triage", triage_node)
     builder.add_node("rag_retrieval", retrieval_node)
+    builder.add_node("response_generation", response_node)
 
     builder.add_edge(START, "validate_input")
     builder.add_edge("validate_input", "transcription")
     builder.add_edge("transcription", "vision_analysis")
     builder.add_edge("vision_analysis", "safety_triage")
     builder.add_edge("safety_triage", "rag_retrieval")
-    builder.add_edge("rag_retrieval", END)
+    builder.add_edge("rag_retrieval", "response_generation")
+    builder.add_edge("response_generation", END)
 
     return builder.compile()

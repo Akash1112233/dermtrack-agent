@@ -48,3 +48,19 @@ class Consultation(BaseModel):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+    
+
+class KnowledgeDocument(BaseModel):
+    """Trusted document used by the RAG system."""
+
+    source_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    content: str = Field(min_length=1)
+    source_type: str = Field(min_length=1)
+    url: HttpUrl
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
+    embedding: list[float] = Field(default_factory=list)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )

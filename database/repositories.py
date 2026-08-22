@@ -99,3 +99,65 @@ class KnowledgeDocumentRepository:
             return None
 
         return KnowledgeDocument.model_validate(document)
+
+    def similarity_search(
+        self,
+        query_embedding: list[float],
+        limit: int = 4,
+        index_name: str = "knowledge_vector_index",
+    ) -> list[dict[str, Any]]:
+        """Search knowledge chunks using MongoDB Atlas Vector Search."""
+        if not query_embedding:
+            raise ValueError(
+                "query_embedding cannot be empty."
+            )
+
+        if limit <= 0:
+            raise ValueError(
+                "limit must be greater than zero."
+            )
+
+        pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": index_name,
+                    "path": "embedding",
+                    "queryVector": query_embedding,
+                    "numCandidates": max(limit * 10, 50),
+                    "limit": limit,
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "source_id": 1,
+                    "title": 1,
+                    "content": 1,
+                    "source_type": 1,
+                    "url": 1,
+                    "tags": 1,
+                    "metadata": 1,
+                    "embedding": 1,
+                    "created_at": 1,
+                    "score": {
+                        "$meta": "vectorSearchScore"
+                    },
+                }
+            },
+        ]
+
+        results = []
+
+        for result in self.collection.aggregate(pipeline):
+            score = float(result.pop("score", 0.0))
+
+            results.append(
+                {
+                    "document": KnowledgeDocument.model_validate(
+                        result
+                    ),
+                    "score": score,
+                }
+            )
+
+        return results

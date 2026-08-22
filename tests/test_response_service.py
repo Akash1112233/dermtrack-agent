@@ -74,3 +74,29 @@ def test_response_service_rejects_empty_consultation():
             triage=None,
             sources=[],
         )
+
+class StructuredFakeChatModel:
+    def invoke(self, messages):
+        return SimpleNamespace(
+            content=[
+                {
+                    "type": "text",
+                    "text": "Structured Gemini response.",
+                }
+            ]
+        )
+def test_response_service_handles_structured_content():
+    service = GeminiResponseService(
+        api_key="test-key",
+        model_name="gemini-3.6-flash",
+        model=StructuredFakeChatModel(),
+    )
+
+    response = service.generate(
+        transcript="I have mild redness.",
+        observations=[],
+        triage=None,
+        sources=[],
+    )
+
+    assert response == "Structured Gemini response."

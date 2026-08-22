@@ -5,6 +5,7 @@ from app.config import Settings, get_settings
 from database.mongodb import get_database
 from database.repositories import (
     ConsultationRepository,
+    KnowledgeDocumentRepository,
     PatientRepository,
 )
 
@@ -14,6 +15,7 @@ class Repositories:
 
     patients: PatientRepository
     consultations: ConsultationRepository
+    knowledge_documents: KnowledgeDocumentRepository
 
 def build_repositories(
     database: Any | None = None,
@@ -24,10 +26,13 @@ def build_repositories(
     configured_database = database or get_database(configured_settings)
 
     return Repositories(
-        patients=PatientRepository(
-            configured_database["patients"]
-        ),
-        consultations=ConsultationRepository(
-            configured_database["consultations"]
-        ),
-    )
+    patients=PatientRepository(
+        configured_database["patients"]
+    ),
+    consultations=ConsultationRepository(
+        configured_database["consultations"]
+    ),
+    knowledge_documents=KnowledgeDocumentRepository(
+        configured_database["knowledge_documents"]
+    ),
+)

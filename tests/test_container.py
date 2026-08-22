@@ -8,6 +8,7 @@ class FakeDatabase:
         self.collections = {
             "patients": FakeCollection(),
             "consultations": FakeCollection(),
+            "knowledge_documents": FakeCollection(),
         }
 
     def __getitem__(self, collection_name):
@@ -22,4 +23,8 @@ def test_build_repositories_connects_required_collections():
     assert (
         repositories.consultations.collection
         is database.collections["consultations"]
+    )
+    assert (
+        repositories.knowledge_documents.collection
+        is database.collections["knowledge_documents"]
     )

@@ -97,14 +97,46 @@ If no useful observation is possible, return [].
                 "Gemini returned invalid observation data."
             ) from error
 
-    @staticmethod
-    def _extract_response_text(response: Any) -> str:
-        """Extract text from a LangChain model response."""
-        content = response.content
+    
+    def _extract_response_text(self, response) -> str:
+        raw_values = [
+            getattr(response, "text", None),
+            getattr(response, "content", None),
+        ]
 
-        if isinstance(content, str):
-            return content.strip()
+        for raw_value in raw_values:
+            extracted = self._normalize_response_content(
+                raw_value
+            )
+
+            if extracted:
+                return extracted
 
         raise ValueError(
             "Gemini returned an unsupported response format."
         )
+
+    @staticmethod
+    def _normalize_response_content(
+        raw_value,
+    ) -> str:
+        if isinstance(raw_value, str):
+            return raw_value.strip()
+
+        if isinstance(raw_value, list):
+            text_parts = []
+
+            for part in raw_value:
+                if isinstance(part, str):
+                    text_parts.append(part)
+
+                elif isinstance(part, dict):
+                    text = part.get("text")
+
+                    if isinstance(text, str):
+                        text_parts.append(text)
+
+            return "\n".join(text_parts).strip()
+
+        return ""
+

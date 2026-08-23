@@ -18,6 +18,7 @@ class SafetyTriageService:
         "eye involvement",
         "vision changes",
         "severe pain",
+        "bleeding",
         "high fever",
         "fainting",
         "unconscious",

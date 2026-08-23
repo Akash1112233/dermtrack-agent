@@ -48,6 +48,19 @@ def test_triage_detects_red_flag_in_observation():
     assert result.risk_level == "urgent"
     assert result.needs_human_review is True
 
+def test_triage_detects_bleeding():
+    service = SafetyTriageService()
+
+    result = service.evaluate(
+        transcript="The spot is itchy and sometimes bleeding.",
+        observations=[],
+    )
+
+    assert result.risk_level == "urgent"
+    assert "bleeding" in result.red_flags
+    assert result.needs_human_review is True
+
+
 def test_triage_explanation_is_always_present():
     service = SafetyTriageService()
 

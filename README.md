@@ -87,6 +87,8 @@ Expected response:
 | POST | `/consultations/multimodal` | Multipart text and image consultation |
 | POST | `/transcribe` | Deepgram speech-to-text for recorded audio |
 | POST | `/speak` | Deepgram text-to-speech response audio |
+| GET | `/consultations/{consultation_id}` | Read one stored consultation document |
+| GET | `/consultations/{consultation_id}/image` | Read its stored MongoDB GridFS image |
 | GET | `/patients/{patient_id}/consultations` | Consultation history |
 | GET | `/docs` | Swagger API documentation |
 
@@ -121,6 +123,39 @@ Uploaded PNG, JPEG, and WEBP images are stored in MongoDB GridFS. The consultati
 
 The multimodal form accepts symptom onset, duration, progression, affected area, itch and pain severity, triggers, prior treatments, allergies, current medications, medical history, and clinician-provided prescription/follow-up notes. These are stored as `patient_intake` fields for future longitudinal analysis. DermTrack does not generate prescriptions.
 
+## Adding your own RAG sources
+
+Create a UTF-8 `.txt` or `.md` file containing trusted educational or clinical-reference content. The ingestion command automatically chunks, embeds, and stores it in MongoDB:
+
+```powershell
+uv run python -m scripts.ingest_source `
+    --source-id aad-eczema-guidance-2026 `
+    --title "AAD eczema guidance" `
+    --url "https://www.aad.org/public/diseases/eczema" `
+    --file .\data\sources\aad-eczema-guidance.md `
+    --source-type clinical_reference `
+    --tag dermatology `
+    --tag eczema
+```
+
+Use authoritative sources such as government health services, recognized dermatology associations, or peer-reviewed references. Do not paste prescriptions as general guidance. The source URL and metadata are preserved with every chunk so retrieved evidence can be shown later.
+
+## Viewing stored data
+
+MongoDB Atlas shows consultation documents in the `dermtrack.consultations` collection. Uploaded image binaries are in the `dermtrack.consultation_images.files` and `dermtrack.consultation_images.chunks` GridFS collections. RAG chunks are in `dermtrack.knowledge_documents`.
+
+You can also use the API:
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:8000/patients/demo_image_patient/consultations?limit=10" | ConvertTo-Json -Depth 20
+Invoke-RestMethod "http://127.0.0.1:8000/consultations/<consultation_id>" | ConvertTo-Json -Depth 20
+```
+
+Open the image endpoint in a browser or download it with:
+
+```powershell
+curl.exe -o stored-image.png "http://127.0.0.1:8000/consultations/<consultation_id>/image"
+```
 ## Consultation history example
 
 ```powershell

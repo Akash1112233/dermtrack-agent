@@ -195,13 +195,13 @@ def create_app(
         <details>
           <summary>Add details for future analysis</summary>
           <div class="intake-grid">
-            <input name="symptom_onset" placeholder="When did it start?">
-            <input name="symptom_duration" placeholder="How long has it lasted?">
-            <input name="progression" placeholder="Better, worse, or unchanged?">
-            <input name="affected_area" placeholder="Affected body area">
-            <input name="itch_severity" type="number" min="0" max="10" placeholder="Itch severity (0-10)">
-            <input name="pain_severity" type="number" min="0" max="10" placeholder="Pain severity (0-10)">
-            <input name="triggers" placeholder="Possible triggers">
+            <select name="symptom_onset"><option value="">When did it start?</option><option>Today</option><option>1-7 days ago</option><option>1-4 weeks ago</option><option>1-3 months ago</option><option>More than 3 months ago</option><option>Not sure</option></select>
+            <select name="symptom_duration"><option value="">How long has it lasted?</option><option>Less than 24 hours</option><option>1-7 days</option><option>1-4 weeks</option><option>1-3 months</option><option>More than 3 months</option></select>
+            <select name="progression"><option value="">How is it changing?</option><option>Getting better</option><option>Unchanged</option><option>Getting worse</option><option>Comes and goes</option><option>Not sure</option></select>
+            <select name="affected_area"><option value="">Affected body area</option><option>Face</option><option>Scalp</option><option>Neck</option><option>Chest or back</option><option>Arms or hands</option><option>Legs or feet</option><option>Multiple areas</option><option>Other</option></select>
+            <select name="itch_severity"><option value="">Itch severity (0-10)</option><option value="0">0 - None</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 - Moderate</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 - Severe</option></select>
+            <select name="pain_severity"><option value="">Pain severity (0-10)</option><option value="0">0 - None</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 - Moderate</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10 - Severe</option></select>
+            <select name="triggers"><option value="">Possible trigger</option><option>New product or cosmetic</option><option>Food or medicine</option><option>Heat or sweating</option><option>Sun exposure</option><option>Insect bite</option><option>Contact or friction</option><option>Unknown</option></select>
             <input name="prior_treatments" placeholder="Previous treatments">
             <input name="allergies" placeholder="Allergies">
             <input name="current_medications" placeholder="Current medications">
@@ -356,8 +356,14 @@ def create_app(
         const audio = await response.blob();
         audioPlayer.src = URL.createObjectURL(audio);
         audioPlayer.hidden = false;
-        await audioPlayer.play();
-      } catch (error) { result.innerHTML += '<br><br><strong>' + escapeHtml(error.message) + '</strong>'; }
+        audioPlayer.controls = true;
+        audioPlayer.load();
+        try {
+          await audioPlayer.play();
+        } catch (_) {
+          result.innerHTML += '<br><br><strong>Audio is ready. Press Play on the audio controls.</strong>';
+        }
+      } catch (error) { result.innerHTML += '<br><br><strong>Voice error: ' + escapeHtml(error.message) + '</strong>'; }
       finally { speakButton.disabled = false; }
     });
   </script>
@@ -588,6 +594,37 @@ def create_app(
                 Path(temporary_path).unlink(
                     missing_ok=True
                 )
+    @app.get(
+        "/consultations/{consultation_id}",
+        response_model=Consultation,
+    )
+    def get_consultation(consultation_id: str) -> Consultation:
+        consultation = configured_application.consultation_repository.get_by_id(
+            consultation_id
+        )
+        if consultation is None:
+            raise HTTPException(status_code=404, detail="Consultation not found")
+        return consultation
+
+    @app.get("/consultations/{consultation_id}/image")
+    def get_consultation_image(consultation_id: str) -> Response:
+        consultation = configured_application.consultation_repository.get_by_id(
+            consultation_id
+        )
+        image_repository = getattr(configured_application, "image_repository", None)
+        if consultation is None or not consultation.image_file_id:
+            raise HTTPException(status_code=404, detail="Stored image not found")
+        if image_repository is None:
+            raise HTTPException(status_code=503, detail="Image storage is not configured")
+        try:
+            image_bytes = image_repository.open(consultation.image_file_id)
+        except Exception as error:
+            raise HTTPException(status_code=404, detail="Stored image could not be read") from error
+        return Response(
+            content=image_bytes,
+            media_type=consultation.image_content_type or "application/octet-stream",
+        )
+
     @app.get(
         "/patients/{patient_id}/consultations",
         response_model=list[Consultation],

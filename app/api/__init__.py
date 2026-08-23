@@ -163,10 +163,15 @@ def create_app(
     button.recording { background: #bd4057; }
     button:disabled { opacity: .55; cursor: not-allowed; }
     #recording-status { align-self: center; color: #bd4057; font-size: 14px; }
-    pre { white-space: pre-wrap; background: #f4f8fa; padding: 16px;
+    .result-card { background: #f4f8fa; padding: 18px;
       border: 1px solid var(--line); border-radius: 10px; margin-top: 24px;
-      overflow-x: auto; }
-    audio { width: 100%; margin-top: 14px; }
+      line-height: 1.6; }
+    .result-card h3 { margin: 0 0 8px; color: var(--blue); }
+    .risk { display: inline-block; padding: 5px 10px; border-radius: 999px;
+      background: var(--mint); color: #176b60; font-weight: 700; }
+    .risk.urgent { background: #ffe1e6; color: #a1263d; }
+    .source-list { padding-left: 20px; }
+
   </style>
 </head>
 <body>
@@ -191,7 +196,7 @@ def create_app(
           <button type="submit">Submit consultation</button>
         </div>
       </form>
-      <pre id="result">Your result will appear here.</pre>
+      <div id="result" class="result-card">Your result will appear here.</div>
       <button id="speak-button" class="secondary" type="button" hidden>🔊 Read response aloud</button>
       <audio id="audio-player" controls hidden></audio>
     </section>
@@ -208,6 +213,47 @@ def create_app(
     let recorder = null;
     let audioChunks = [];
     let latestResponseText = '';
+    let progressTimer = null;
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>\'\"]/g, (character) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[character]));
+    }
+
+    function formattedText(value) {
+      return escapeHtml(value).split(String.fromCharCode(10)).join('<br>');
+    }
+
+    function showProgress() {
+      const stages = [
+        'Uploading your details...',
+        'Reviewing the reported symptoms...',
+        'Analyzing the image observations...',
+        'Checking safety signals...',
+        'Searching trusted skin-care guidance...',
+        'Preparing your patient-friendly response...'
+      ];
+      let index = 0;
+      result.innerHTML = '<strong>' + stages[0] + '</strong>';
+      progressTimer = setInterval(() => {
+        index = Math.min(index + 1, stages.length - 1);
+        result.innerHTML = '<strong>' + stages[index] + '</strong>';
+      }, 1800);
+    }
+
+    function renderResponse(body) {
+      const risk = escapeHtml(body.risk_level || 'unknown');
+      const urgency = body.needs_human_review
+        ? '<p><strong>Human review recommended:</strong> Please seek professional evaluation.</p>'
+        : '';
+      const sources = (body.retrieved_sources || []).map((source) =>
+        '<li>' + escapeHtml(source.title || source.source_id) + '</li>'
+      ).join('');
+      result.innerHTML = '<span class="risk ' + (risk === 'urgent' ? 'urgent' : '') + '">Risk: ' + risk + '</span>' +
+        urgency + '<h3>DermTrack guidance</h3><p>' + formattedText(body.response_text) + '</p>' +
+        (sources ? '<h3>Trusted sources</h3><ul class="source-list">' + sources + '</ul>' : '');
+    }
 
     recordButton.addEventListener('click', async () => {
       try {
@@ -251,7 +297,7 @@ def create_app(
       data.append('transcript', document.getElementById('transcript').value);
       const image = document.getElementById('image').files[0];
       if (image) data.append('image', image);
-      result.textContent = 'Processing...';
+      showProgress();
       try {
         const response = await fetch('/consultations/multimodal', {
           method: 'POST', body: data
@@ -260,9 +306,11 @@ def create_app(
         if (!response.ok) throw new Error(body.detail || 'Consultation failed');
         latestResponseText = body.response_text || '';
         speakButton.hidden = !latestResponseText;
-        result.textContent = JSON.stringify(body, null, 2);
+        renderResponse(body);
       } catch (error) {
-        result.textContent = 'Request failed: ' + error;
+        result.innerHTML = '<strong>Request failed:</strong> ' + escapeHtml(error.message || error);
+      } finally {
+        clearInterval(progressTimer);
       }
     });
 
@@ -276,7 +324,7 @@ def create_app(
         audioPlayer.src = URL.createObjectURL(audio);
         audioPlayer.hidden = false;
         await audioPlayer.play();
-      } catch (error) { result.textContent += '\n\n' + error.message; }
+      } catch (error) { result.innerHTML += '<br><br><strong>' + escapeHtml(error.message) + '</strong>'; }
       finally { speakButton.disabled = false; }
     });
   </script>

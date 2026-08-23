@@ -99,15 +99,21 @@ Safety triage:
 Retrieved knowledge sources:
 {source_text}
 
-Write a concise, empathetic response for the patient.
-Keep the response non-diagnostic and do not mention named skin conditions.
-"""
+Write a concise, empathetic response for the patient using exactly these sections:
 
+1. What you reported and what the image appears to show
+2. Safe steps while waiting for professional evaluation
+3. When to seek urgent or emergency care
+4. Questions to discuss with a healthcare professional
+
+Keep the response non-diagnostic and do not mention named skin conditions.
+Do not recommend prescription medicines or specific treatment regimens.
+"""
 
         response = self.model.invoke(
             [HumanMessage(content=prompt)]
         )
-        
+
         # Cleaned up duplicate return statements and handled multimodal content parts
         raw_content = response.content
         if isinstance(raw_content, str):

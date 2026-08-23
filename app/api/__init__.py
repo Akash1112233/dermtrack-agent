@@ -12,6 +12,7 @@ from tempfile import NamedTemporaryFile
 from pydantic import BaseModel, Field
 from pydantic import BaseModel, Field, field_validator
 from agents.state import create_initial_state
+from database.schemas import Consultation
 from app.application import ConsultationApplication
 
 class ConsultationRequest(BaseModel):
@@ -231,5 +232,45 @@ def create_app(
                 Path(temporary_path).unlink(
                     missing_ok=True
                 )
+    @app.get(
+        "/patients/{patient_id}/consultations",
+        response_model=list[Consultation],
+    )
+    def get_patient_consultations(
+        patient_id: str,
+        limit: int = 20,
+    ) -> list[Consultation]:
+        cleaned_patient_id = patient_id.strip()
+
+        if not cleaned_patient_id:
+            raise HTTPException(
+                status_code=422,
+                detail="patient_id cannot be empty.",
+            )
+
+        if limit < 1 or limit > 100:
+            raise HTTPException(
+                status_code=422,
+                detail="limit must be between 1 and 100.",
+            )
+
+        repository = getattr(
+            configured_application,
+            "consultation_repository",
+            None,
+        )
+
+        if repository is None:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Consultation history is not configured."
+                ),
+            )
+
+        return repository.list_by_patient(
+            patient_id=cleaned_patient_id,
+            limit=limit,
+        )
 
     return app

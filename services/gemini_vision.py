@@ -76,7 +76,7 @@ If no useful observation is possible, return [].
         response_text = self._extract_response_text(response)
 
         try:
-            raw_observations = json.loads(response_text)
+            raw_observations = self._parse_json_array(response_text)
         except json.JSONDecodeError as error:
             raise ValueError(
                 "Gemini did not return valid JSON."
@@ -139,4 +139,29 @@ If no useful observation is possible, return [].
             return "\n".join(text_parts).strip()
 
         return ""
+
+    @staticmethod
+    def _parse_json_array(response_text: str) -> list[dict[str, Any]]:
+        """Parse plain, fenced, or explanatory Gemini JSON output."""
+        cleaned = response_text.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            cleaned = "\n".join(
+                line for line in lines
+                if not line.strip().startswith("```")
+            ).strip()
+
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError:
+            start = cleaned.find("[")
+            end = cleaned.rfind("]")
+            if start < 0 or end <= start:
+                raise
+            parsed = json.loads(cleaned[start:end + 1])
+
+        if not isinstance(parsed, list):
+            raise ValueError("Gemini response must be a JSON array.")
+
+        return parsed
 

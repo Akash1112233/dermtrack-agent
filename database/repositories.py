@@ -1,6 +1,10 @@
+from io import BytesIO
 from typing import Any
+
+from gridfs import GridFSBucket
+
 from database.schemas import Consultation, KnowledgeDocument, Patient
-from database.schemas import Consultation, Patient
+
 
 class PatientRepository:
     """Database operations for patient documents."""
@@ -9,21 +13,13 @@ class PatientRepository:
         self.collection = collection
 
     def create(self, patient: Patient) -> Patient:
-        """Insert a patient document."""
-        document = patient.model_dump(mode="json")
-        self.collection.insert_one(document)
+        self.collection.insert_one(patient.model_dump(mode="json"))
         return patient
 
     def get_by_id(self, patient_id: str) -> Patient | None:
-        """Retrieve a patient by patient ID."""
-        document = self.collection.find_one(
-            {"patient_id": patient_id}
-        )
+        document = self.collection.find_one({"patient_id": patient_id})
+        return Patient.model_validate(document) if document else None
 
-        if document is None:
-            return None
-
-        return Patient.model_validate(document)
 
 class ConsultationRepository:
     """Database operations for consultation documents."""
@@ -32,38 +28,43 @@ class ConsultationRepository:
         self.collection = collection
 
     def create(self, consultation: Consultation) -> Consultation:
-        """Insert a consultation document."""
-        document = consultation.model_dump(mode="json")
-        self.collection.insert_one(document)
+        self.collection.insert_one(consultation.model_dump(mode="json"))
         return consultation
 
     def get_by_id(self, consultation_id: str) -> Consultation | None:
-        """Retrieve a consultation by consultation ID."""
-        document = self.collection.find_one(
-            {"consultation_id": consultation_id}
+        document = self.collection.find_one({"consultation_id": consultation_id})
+        return Consultation.model_validate(document) if document else None
+
+    def list_by_patient(self, patient_id: str, limit: int = 20) -> list[Consultation]:
+        documents = self.collection.find({"patient_id": patient_id}).sort("created_at", -1)
+        return [Consultation.model_validate(document) for document in documents[:limit]]
+
+
+class ImageRepository:
+    """Store consultation images in MongoDB GridFS."""
+
+    def __init__(self, database: Any, bucket_name: str = "consultation_images"):
+        self.bucket = GridFSBucket(database, bucket_name=bucket_name)
+
+    def store(self, image_bytes: bytes, filename: str, content_type: str, patient_id: str) -> str:
+        file_id = self.bucket.upload_from_stream(
+            filename,
+            BytesIO(image_bytes),
+            metadata={
+                "content_type": content_type,
+                "patient_id": patient_id,
+                "purpose": "dermtrack_consultation_image",
+            },
         )
+        return str(file_id)
 
-        if document is None:
-            return None
+    def open(self, file_id: str) -> bytes:
+        from bson import ObjectId
 
-        return Consultation.model_validate(document)
+        output = BytesIO()
+        self.bucket.download_to_stream(ObjectId(file_id), output)
+        return output.getvalue()
 
-    def list_by_patient(
-        self,
-        patient_id: str,
-        limit: int = 20,
-    ) -> list[Consultation]:
-        """Return the newest consultations for a patient."""
-        documents = (
-            self.collection
-            .find({"patient_id": patient_id})
-            .sort("created_at", -1)
-        )
-
-        return [
-            Consultation.model_validate(document)
-            for document in documents[:limit]
-        ]
 
 class KnowledgeDocumentRepository:
     """Database operations for RAG knowledge documents."""
@@ -71,34 +72,17 @@ class KnowledgeDocumentRepository:
     def __init__(self, collection: Any):
         self.collection = collection
 
-    def upsert(
-        self,
-        document: KnowledgeDocument,
-    ) -> KnowledgeDocument:
-        """Insert or replace a document using its source ID."""
-        serialized_document = document.model_dump(mode="json")
-
+    def upsert(self, document: KnowledgeDocument) -> KnowledgeDocument:
         self.collection.replace_one(
             {"source_id": document.source_id},
-            serialized_document,
+            document.model_dump(mode="json"),
             upsert=True,
         )
-
         return document
 
-    def get_by_source_id(
-        self,
-        source_id: str,
-    ) -> KnowledgeDocument | None:
-        """Retrieve a knowledge document by source ID."""
-        document = self.collection.find_one(
-            {"source_id": source_id}
-        )
-
-        if document is None:
-            return None
-
-        return KnowledgeDocument.model_validate(document)
+    def get_by_source_id(self, source_id: str) -> KnowledgeDocument | None:
+        document = self.collection.find_one({"source_id": source_id})
+        return KnowledgeDocument.model_validate(document) if document else None
 
     def similarity_search(
         self,
@@ -106,58 +90,39 @@ class KnowledgeDocumentRepository:
         limit: int = 4,
         index_name: str = "knowledge_vector_index",
     ) -> list[dict[str, Any]]:
-        """Search knowledge chunks using MongoDB Atlas Vector Search."""
         if not query_embedding:
-            raise ValueError(
-                "query_embedding cannot be empty."
-            )
-
+            raise ValueError("query_embedding cannot be empty.")
         if limit <= 0:
-            raise ValueError(
-                "limit must be greater than zero."
-            )
+            raise ValueError("limit must be greater than zero.")
 
         pipeline = [
-            {
-                "$vectorSearch": {
-                    "index": index_name,
-                    "path": "embedding",
-                    "queryVector": query_embedding,
-                    "numCandidates": max(limit * 10, 50),
-                    "limit": limit,
-                }
-            },
-            {
-                "$project": {
-                    "_id": 0,
-                    "source_id": 1,
-                    "title": 1,
-                    "content": 1,
-                    "source_type": 1,
-                    "url": 1,
-                    "tags": 1,
-                    "metadata": 1,
-                    "embedding": 1,
-                    "created_at": 1,
-                    "score": {
-                        "$meta": "vectorSearchScore"
-                    },
-                }
-            },
+            {"$vectorSearch": {
+                "index": index_name,
+                "path": "embedding",
+                "queryVector": query_embedding,
+                "numCandidates": max(limit * 10, 50),
+                "limit": limit,
+            }},
+            {"$project": {
+                "_id": 0,
+                "source_id": 1,
+                "title": 1,
+                "content": 1,
+                "source_type": 1,
+                "url": 1,
+                "tags": 1,
+                "metadata": 1,
+                "embedding": 1,
+                "created_at": 1,
+                "score": {"$meta": "vectorSearchScore"},
+            }},
         ]
 
         results = []
-
         for result in self.collection.aggregate(pipeline):
             score = float(result.pop("score", 0.0))
-
-            results.append(
-                {
-                    "document": KnowledgeDocument.model_validate(
-                        result
-                    ),
-                    "score": score,
-                }
-            )
-
+            results.append({
+                "document": KnowledgeDocument.model_validate(result),
+                "score": score,
+            })
         return results

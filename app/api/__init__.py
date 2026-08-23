@@ -13,7 +13,7 @@ from tempfile import NamedTemporaryFile
 from pydantic import BaseModel, Field
 from pydantic import BaseModel, Field, field_validator
 from agents.state import create_initial_state
-from database.schemas import Consultation
+from database.schemas import Consultation, PatientIntake
 from app.application import ConsultationApplication
 
 class ConsultationRequest(BaseModel):
@@ -21,6 +21,7 @@ class ConsultationRequest(BaseModel):
 
     patient_id: str = Field(min_length=1)
     transcript: str = Field(min_length=1)
+    patient_intake: PatientIntake = Field(default_factory=PatientIntake)
 
     @field_validator("transcript")
     @classmethod
@@ -171,6 +172,12 @@ def create_app(
       background: var(--mint); color: #176b60; font-weight: 700; }
     .risk.urgent { background: #ffe1e6; color: #a1263d; }
     .source-list { padding-left: 20px; }
+    details { margin-top: 18px; border: 1px solid var(--line);
+      border-radius: 10px; padding: 12px; background: #fbffff; }
+    summary { cursor: pointer; font-weight: 700; color: var(--blue); }
+    .intake-grid { display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 10px; margin-top: 8px; }
+    @media (max-width: 650px) { .intake-grid { grid-template-columns: 1fr; } }
 
   </style>
 </head>
@@ -185,6 +192,23 @@ def create_app(
         <input id="patient_id" required value="demo_ui_patient">
         <label for="transcript">What did you notice?</label>
         <textarea id="transcript" placeholder="Describe itching, redness, pain, bleeding, when it started, and any changes..."></textarea>
+        <details>
+          <summary>Add details for future analysis</summary>
+          <div class="intake-grid">
+            <input name="symptom_onset" placeholder="When did it start?">
+            <input name="symptom_duration" placeholder="How long has it lasted?">
+            <input name="progression" placeholder="Better, worse, or unchanged?">
+            <input name="affected_area" placeholder="Affected body area">
+            <input name="itch_severity" type="number" min="0" max="10" placeholder="Itch severity (0-10)">
+            <input name="pain_severity" type="number" min="0" max="10" placeholder="Pain severity (0-10)">
+            <input name="triggers" placeholder="Possible triggers">
+            <input name="prior_treatments" placeholder="Previous treatments">
+            <input name="allergies" placeholder="Allergies">
+            <input name="current_medications" placeholder="Current medications">
+            <input name="medical_history" placeholder="Relevant medical history">
+            <input name="clinician_prescription_notes" placeholder="Clinician prescription/follow-up notes">
+          </div>
+        </details>
         <div class="actions">
           <button id="record-button" type="button">🎙️ Start speaking</button>
           <button id="stop-button" class="secondary" type="button" disabled>Stop recording</button>
@@ -269,7 +293,10 @@ def create_app(
           status.textContent = 'Transcribing with Deepgram...';
           try {
             const response = await fetch('/transcribe', {method: 'POST', body: data});
-            const body = await response.json();
+            const raw = await response.text();
+            let body;
+            try { body = JSON.parse(raw); }
+            catch (_) { throw new Error(raw || 'Transcription request failed'); }
             if (!response.ok) throw new Error(body.detail || 'Transcription failed');
             transcript.value = body.transcript;
             status.textContent = 'Transcript added.';
@@ -295,6 +322,9 @@ def create_app(
       const data = new FormData();
       data.append('patient_id', document.getElementById('patient_id').value);
       data.append('transcript', document.getElementById('transcript').value);
+      document.querySelectorAll('.intake-grid [name]').forEach((field) => {
+        if (field.value !== '') data.append(field.name, field.value);
+      });
       const image = document.getElementById('image').files[0];
       if (image) data.append('image', image);
       showProgress();
@@ -302,7 +332,10 @@ def create_app(
         const response = await fetch('/consultations/multimodal', {
           method: 'POST', body: data
         });
-        const body = await response.json();
+        const raw = await response.text();
+        let body;
+        try { body = JSON.parse(raw); }
+        catch (_) { throw new Error(raw || 'Consultation request failed'); }
         if (!response.ok) throw new Error(body.detail || 'Consultation failed');
         latestResponseText = body.response_text || '';
         speakButton.hidden = !latestResponseText;
@@ -348,10 +381,14 @@ def create_app(
         state = create_initial_state(
             patient_id=request.patient_id,
             consultation_id=consultation_id,
+            patient_intake=request.patient_intake,
         )
         state["transcript"] = request.transcript
 
-        result = configured_application.run(state)
+        try:
+            result = configured_application.run(state)
+        except ValueError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
 
         triage = result.get("triage")
 
@@ -384,6 +421,18 @@ def create_app(
     async def create_multimodal_consultation(
         patient_id: str = Form(...),
         transcript: str = Form(""),
+        symptom_onset: str = Form(""),
+        symptom_duration: str = Form(""),
+        progression: str = Form(""),
+        affected_area: str = Form(""),
+        itch_severity: int | None = Form(default=None),
+        pain_severity: int | None = Form(default=None),
+        triggers: str = Form(""),
+        prior_treatments: str = Form(""),
+        allergies: str = Form(""),
+        current_medications: str = Form(""),
+        medical_history: str = Form(""),
+        clinician_prescription_notes: str = Form(""),
         image: UploadFile | None = File(default=None),
     ) -> ConsultationResponse:
         cleaned_patient_id = patient_id.strip()
@@ -414,6 +463,20 @@ def create_app(
             )
 
             state["transcript"] = cleaned_transcript
+            state["patient_intake"] = PatientIntake(
+                symptom_onset=symptom_onset.strip(),
+                symptom_duration=symptom_duration.strip(),
+                progression=progression.strip(),
+                affected_area=affected_area.strip(),
+                itch_severity=itch_severity,
+                pain_severity=pain_severity,
+                triggers=triggers.strip(),
+                prior_treatments=prior_treatments.strip(),
+                allergies=allergies.strip(),
+                current_medications=current_medications.strip(),
+                medical_history=medical_history.strip(),
+                clinician_prescription_notes=clinician_prescription_notes.strip(),
+            )
 
             if image is not None:
                 allowed_types = {
@@ -448,6 +511,20 @@ def create_app(
                         ),
                     )
 
+                image_repository = getattr(
+                    configured_application,
+                    "image_repository",
+                    None,
+                )
+                if image_repository is not None:
+                    state["image_file_id"] = image_repository.store(
+                        image_bytes=image_bytes,
+                        filename=image.filename or "consultation-image",
+                        content_type=image.content_type,
+                        patient_id=cleaned_patient_id,
+                    )
+                    state["image_content_type"] = image.content_type
+
                 suffix = Path(
                     image.filename or ""
                 ).suffix.lower()
@@ -469,7 +546,10 @@ def create_app(
 
                 state["image_path"] = temporary_path
 
-            result = configured_application.run(state)
+            try:
+                result = configured_application.run(state)
+            except ValueError as error:
+                raise HTTPException(status_code=502, detail=str(error)) from error
             triage = result.get("triage")
 
             if triage is None:

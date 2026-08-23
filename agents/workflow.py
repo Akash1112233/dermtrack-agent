@@ -156,6 +156,9 @@ def build_consultation_graph(
             consultation_id=state["consultation_id"],
             patient_id=state["patient_id"],
             transcript=state.get("transcript", ""),
+            patient_intake=state.get("patient_intake", {}),
+            image_file_id=state.get("image_file_id"),
+            image_content_type=state.get("image_content_type"),
             observations=state.get(
                 "image_observations",
                 [],

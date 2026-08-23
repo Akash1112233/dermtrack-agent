@@ -213,3 +213,46 @@ def test_speak_endpoint_returns_audio():
     assert response.status_code == 200
     assert response.content == b"fake-mp3-audio"
     assert response.headers["content-type"] == "audio/mpeg"
+
+
+class FakeImageRepository:
+    def __init__(self):
+        self.received = None
+
+    def store(self, image_bytes, filename, content_type, patient_id):
+        self.received = (image_bytes, filename, content_type, patient_id)
+        return "gridfs-file-001"
+
+
+class FakeStoredMediaApplication(FakeMultimodalApplication):
+    def __init__(self):
+        super().__init__()
+        self.image_repository = FakeImageRepository()
+
+
+def test_multimodal_stores_image_and_intake_details():
+    fake_application = FakeStoredMediaApplication()
+    app = create_app(application=fake_application)
+    client = TestClient(app)
+
+    response = client.post(
+        "/consultations/multimodal",
+        data={
+            "patient_id": "patient_002",
+            "transcript": "It is itchy.",
+            "symptom_duration": "two weeks",
+            "progression": "getting worse",
+            "itch_severity": "7",
+            "allergies": "none known",
+        },
+        files={"image": ("skin.jpeg", b"image", "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    assert fake_application.image_repository.received == (
+        b"image", "skin.jpeg", "image/jpeg", "patient_002"
+    )
+    assert fake_application.received_state["image_file_id"] == "gridfs-file-001"
+    assert fake_application.received_state["patient_intake"].symptom_duration == "two weeks"
+    assert fake_application.received_state["patient_intake"].itch_severity == 7
+

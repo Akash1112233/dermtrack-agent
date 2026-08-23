@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl
 
+
 class Patient(BaseModel):
     """Anonymous patient profile."""
 
@@ -12,12 +13,14 @@ class Patient(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc)
     )
 
+
 class ImageObservation(BaseModel):
     """A non-diagnostic observation extracted from a skin image."""
 
     feature: str = Field(min_length=1)
     confidence: float = Field(ge=0.0, le=1.0)
     body_area: str = "unknown"
+
 
 class TriageResult(BaseModel):
     """Safety classification for a consultation."""
@@ -27,6 +30,24 @@ class TriageResult(BaseModel):
     needs_human_review: bool = False
     explanation: str = Field(min_length=1)
 
+
+class PatientIntake(BaseModel):
+    """Structured patient-reported context for longitudinal analysis."""
+
+    symptom_onset: str = ""
+    symptom_duration: str = ""
+    progression: str = ""
+    affected_area: str = ""
+    itch_severity: int | None = Field(default=None, ge=0, le=10)
+    pain_severity: int | None = Field(default=None, ge=0, le=10)
+    triggers: str = ""
+    prior_treatments: str = ""
+    allergies: str = ""
+    current_medications: str = ""
+    medical_history: str = ""
+    clinician_prescription_notes: str = ""
+
+
 class RetrievedSource(BaseModel):
     """A source returned by the RAG retrieval system."""
 
@@ -35,12 +56,16 @@ class RetrievedSource(BaseModel):
     url: HttpUrl
     similarity_score: float = Field(ge=0.0, le=1.0)
 
+
 class Consultation(BaseModel):
     """Complete consultation document stored in MongoDB."""
 
     consultation_id: str = Field(min_length=1)
     patient_id: str = Field(min_length=1)
     transcript: str = ""
+    patient_intake: PatientIntake = Field(default_factory=PatientIntake)
+    image_file_id: str | None = None
+    image_content_type: str | None = None
     observations: list[ImageObservation] = Field(default_factory=list)
     triage: TriageResult
     retrieved_sources: list[RetrievedSource] = Field(default_factory=list)
@@ -48,7 +73,7 @@ class Consultation(BaseModel):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
-    
+
 
 class KnowledgeDocument(BaseModel):
     """Trusted document used by the RAG system."""

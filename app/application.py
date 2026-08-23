@@ -47,6 +47,11 @@ class ConsultationApplication:
         self.consultation_repository = (
             repositories.consultations
         )
+        self.image_repository = getattr(
+            repositories,
+            "images",
+            None,
+        )
 
         if transcription_service is None:
             transcription_service = DeepgramService(

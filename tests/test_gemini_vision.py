@@ -62,3 +62,17 @@ def test_vision_service_rejects_invalid_response(tmp_path):
 
     with pytest.raises(ValueError, match="valid JSON"):
         service.analyze_image(image_path)
+
+
+def test_vision_service_accepts_fenced_json(tmp_path):
+    image_path = tmp_path / "skin.png"
+    image_path.write_bytes(b"fake image bytes")
+    fake_model = FakeVisionModel(
+        '```json\n[{"feature":"redness","confidence":0.8,"body_area":"arm"}]\n```'
+    )
+
+    service = GeminiVisionService(api_key="test-key", model=fake_model)
+
+    observations = service.analyze_image(image_path)
+
+    assert observations[0].feature == "redness"

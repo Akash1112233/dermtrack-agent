@@ -18,6 +18,8 @@ DermTrack Agent is a non-diagnostic dermatology-support MVP. It accepts symptom 
 - Minimal browser UI
 - Microphone recording with Deepgram transcription
 - Deepgram voice playback for generated responses
+- Structured patient intake for longitudinal analysis
+- MongoDB GridFS storage for uploaded consultation images
 - Automated tests
 
 ## Requirements
@@ -113,7 +115,11 @@ curl.exe -X POST "http://127.0.0.1:8000/consultations/multimodal" `
     -F "image=@.\data\demo\synthetic.png;type=image/png"
 ```
 
-Uploaded images are written to a temporary file for processing and removed after the workflow finishes. Permanent media storage is not enabled in this MVP.
+Uploaded PNG, JPEG, and WEBP images are stored in MongoDB GridFS. The consultation document stores the GridFS file ID and content type alongside the transcript, structured patient intake, observations, triage, retrieved sources, and response. Do not store real patient data without appropriate consent and security controls.
+
+## Stored patient intake
+
+The multimodal form accepts symptom onset, duration, progression, affected area, itch and pain severity, triggers, prior treatments, allergies, current medications, medical history, and clinician-provided prescription/follow-up notes. These are stored as `patient_intake` fields for future longitudinal analysis. DermTrack does not generate prescriptions.
 
 ## Consultation history example
 
@@ -132,7 +138,7 @@ Run the complete test suite:
 uv run pytest -q
 ```
 
-The verified MVP suite currently contains 67 passing tests. A Starlette/httpx deprecation warning may appear; it does not indicate a test failure.
+The verified MVP suite currently contains 74 passing tests. A Starlette/httpx deprecation warning may appear; it does not indicate a test failure.
 
 ## Scope and safety
 

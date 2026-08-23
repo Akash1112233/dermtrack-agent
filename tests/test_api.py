@@ -142,3 +142,14 @@ def test_get_patient_consultations_returns_history():
         == "patient_001"
     )
     assert fake_application.consultation_repository.limit == 10
+
+
+def test_demo_ui_is_available():
+    app = create_app(application=FakeApplication())
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "DermTrack Agent" in response.text
+    assert "consultation-form" in response.text

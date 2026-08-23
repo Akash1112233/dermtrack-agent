@@ -7,6 +7,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
+from fastapi.responses import HTMLResponse
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from pydantic import BaseModel, Field
@@ -55,6 +56,71 @@ def create_app(
         title="DermTrack Agent API",
         version="0.1.0",
     )
+
+    @app.get("/", response_class=HTMLResponse)
+    def demo_ui() -> str:
+        return """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DermTrack Agent</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 760px;
+      margin: 40px auto; padding: 0 20px; color: #172033; }
+    h1 { color: #1e5b83; }
+    label { display: block; margin-top: 16px; font-weight: 600; }
+    input, textarea { box-sizing: border-box; width: 100%;
+      padding: 10px; margin-top: 6px; border: 1px solid #b8c3d1;
+      border-radius: 6px; }
+    textarea { min-height: 120px; }
+    button { margin-top: 20px; padding: 11px 18px; border: 0;
+      border-radius: 6px; background: #1e5b83; color: white;
+      cursor: pointer; }
+    pre { white-space: pre-wrap; background: #f2f5f8; padding: 14px;
+      border-radius: 6px; margin-top: 24px; }
+    .note { color: #58677a; }
+  </style>
+</head>
+<body>
+  <h1>DermTrack Agent</h1>
+  <p class="note">Educational support only. This is not a diagnosis.</p>
+  <form id="consultation-form">
+    <label for="patient_id">Patient ID</label>
+    <input id="patient_id" required value="demo_ui_patient">
+    <label for="transcript">What did you notice?</label>
+    <textarea id="transcript" placeholder="Describe your symptoms..."></textarea>
+    <label for="image">Optional skin image</label>
+    <input id="image" type="file" accept="image/jpeg,image/png,image/webp">
+    <button type="submit">Submit consultation</button>
+  </form>
+  <pre id="result">Your result will appear here.</pre>
+  <script>
+    const form = document.getElementById('consultation-form');
+    const result = document.getElementById('result');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = new FormData();
+      data.append('patient_id', document.getElementById('patient_id').value);
+      data.append('transcript', document.getElementById('transcript').value);
+      const image = document.getElementById('image').files[0];
+      if (image) data.append('image', image);
+      result.textContent = 'Processing...';
+      try {
+        const response = await fetch('/consultations/multimodal', {
+          method: 'POST', body: data
+        });
+        const body = await response.json();
+        result.textContent = JSON.stringify(body, null, 2);
+      } catch (error) {
+        result.textContent = 'Request failed: ' + error;
+      }
+    });
+  </script>
+</body>
+</html>
+        """
 
     @app.get("/health")
     def health() -> dict[str, str]:

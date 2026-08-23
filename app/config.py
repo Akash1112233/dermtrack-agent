@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # Model configuration
     groq_transcription_model: str = "whisper-large-v3"
+    deepgram_stt_model: str = "nova-3"
     gemini_model: str = "gemini-2.5-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
     deepgram_tts_model: str = "aura-2-thalia-en"

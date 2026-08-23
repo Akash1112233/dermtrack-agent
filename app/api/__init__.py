@@ -7,7 +7,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from pydantic import BaseModel, Field
@@ -57,6 +57,77 @@ def create_app(
         version="0.1.0",
     )
 
+    @app.post("/transcribe")
+    async def transcribe_audio(
+        audio: UploadFile = File(...),
+    ) -> dict[str, str]:
+        service = getattr(
+            configured_application,
+            "deepgram_service",
+            None,
+        )
+
+        if service is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Deepgram service is not configured.",
+            )
+
+        audio_bytes = await audio.read()
+
+        if not audio_bytes:
+            raise HTTPException(
+                status_code=422,
+                detail="Audio file is empty.",
+            )
+
+        if len(audio_bytes) > 25 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="Audio file must not exceed 25 MB.",
+            )
+
+        transcript = service.transcribe_bytes(
+            audio_bytes=audio_bytes,
+            content_type=(
+                audio.content_type or "audio/webm"
+            ),
+        )
+
+        return {"transcript": transcript}
+
+    @app.post("/speak")
+    def speak_text(text: str = Form(...)) -> Response:
+        service = getattr(
+            configured_application,
+            "deepgram_service",
+            None,
+        )
+
+        if service is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Deepgram service is not configured.",
+            )
+
+        if not text.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="Text cannot be empty.",
+            )
+
+        audio_bytes = service.synthesize(text)
+
+        return Response(
+            content=audio_bytes,
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": (
+                    "inline; filename=dermtrack-response.mp3"
+                )
+            },
+        )
+
     @app.get("/", response_class=HTMLResponse)
     def demo_ui() -> str:
         return """
@@ -67,38 +138,112 @@ def create_app(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DermTrack Agent</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 760px;
-      margin: 40px auto; padding: 0 20px; color: #172033; }
-    h1 { color: #1e5b83; }
-    label { display: block; margin-top: 16px; font-weight: 600; }
-    input, textarea { box-sizing: border-box; width: 100%;
-      padding: 10px; margin-top: 6px; border: 1px solid #b8c3d1;
-      border-radius: 6px; }
-    textarea { min-height: 120px; }
-    button { margin-top: 20px; padding: 11px 18px; border: 0;
-      border-radius: 6px; background: #1e5b83; color: white;
-      cursor: pointer; }
-    pre { white-space: pre-wrap; background: #f2f5f8; padding: 14px;
-      border-radius: 6px; margin-top: 24px; }
-    .note { color: #58677a; }
+    :root { --ink: #19324a; --blue: #176b87; --mint: #dff5ef;
+      --line: #c8dce0; --card: #ffffff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; color: var(--ink);
+      background: linear-gradient(135deg, #eefaf7, #f4f8ff); }
+    .shell { max-width: 900px; margin: 0 auto; padding: 34px 20px 60px; }
+    .hero { background: var(--card); border: 1px solid var(--line);
+      border-radius: 18px; padding: 28px; box-shadow: 0 12px 35px #17465c12; }
+    h1 { margin: 0 0 8px; color: var(--blue); }
+    h2 { margin: 0 0 18px; }
+    .note { color: #5e7480; }
+    .badge { display: inline-block; background: var(--mint); color: #176b60;
+      padding: 6px 10px; border-radius: 999px; font-size: 13px; }
+    label { display: block; margin-top: 18px; font-weight: 700; }
+    input, textarea { box-sizing: border-box; width: 100%; padding: 12px;
+      margin-top: 7px; border: 1px solid var(--line); border-radius: 9px;
+      background: #fbffff; font: inherit; }
+    textarea { min-height: 125px; resize: vertical; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    button { padding: 11px 16px; border: 0; border-radius: 9px;
+      background: var(--blue); color: white; cursor: pointer; font-weight: 700; }
+    button.secondary { background: #e7f0f2; color: var(--ink); }
+    button.recording { background: #bd4057; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    #recording-status { align-self: center; color: #bd4057; font-size: 14px; }
+    pre { white-space: pre-wrap; background: #f4f8fa; padding: 16px;
+      border: 1px solid var(--line); border-radius: 10px; margin-top: 24px;
+      overflow-x: auto; }
+    audio { width: 100%; margin-top: 14px; }
   </style>
 </head>
 <body>
-  <h1>DermTrack Agent</h1>
-  <p class="note">Educational support only. This is not a diagnosis.</p>
-  <form id="consultation-form">
-    <label for="patient_id">Patient ID</label>
-    <input id="patient_id" required value="demo_ui_patient">
-    <label for="transcript">What did you notice?</label>
-    <textarea id="transcript" placeholder="Describe your symptoms..."></textarea>
-    <label for="image">Optional skin image</label>
-    <input id="image" type="file" accept="image/jpeg,image/png,image/webp">
-    <button type="submit">Submit consultation</button>
-  </form>
-  <pre id="result">Your result will appear here.</pre>
+  <main class="shell">
+    <section class="hero">
+      <span class="badge">Skin health support</span>
+      <h1>DermTrack Agent</h1>
+      <p class="note">Educational support only. This is not a diagnosis.</p>
+      <form id="consultation-form">
+        <label for="patient_id">Patient ID</label>
+        <input id="patient_id" required value="demo_ui_patient">
+        <label for="transcript">What did you notice?</label>
+        <textarea id="transcript" placeholder="Describe itching, redness, pain, bleeding, when it started, and any changes..."></textarea>
+        <div class="actions">
+          <button id="record-button" type="button">🎙️ Start speaking</button>
+          <button id="stop-button" class="secondary" type="button" disabled>Stop recording</button>
+          <span id="recording-status"></span>
+        </div>
+        <label for="image">Optional skin image</label>
+        <input id="image" type="file" accept="image/jpeg,image/png,image/webp">
+        <div class="actions">
+          <button type="submit">Submit consultation</button>
+        </div>
+      </form>
+      <pre id="result">Your result will appear here.</pre>
+      <button id="speak-button" class="secondary" type="button" hidden>🔊 Read response aloud</button>
+      <audio id="audio-player" controls hidden></audio>
+    </section>
+  </main>
   <script>
     const form = document.getElementById('consultation-form');
     const result = document.getElementById('result');
+    const transcript = document.getElementById('transcript');
+    const recordButton = document.getElementById('record-button');
+    const stopButton = document.getElementById('stop-button');
+    const status = document.getElementById('recording-status');
+    const speakButton = document.getElementById('speak-button');
+    const audioPlayer = document.getElementById('audio-player');
+    let recorder = null;
+    let audioChunks = [];
+    let latestResponseText = '';
+
+    recordButton.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+        recorder = new MediaRecorder(stream);
+        audioChunks = [];
+        recorder.ondataavailable = (event) => audioChunks.push(event.data);
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((track) => track.stop());
+          const blob = new Blob(audioChunks, {type: 'audio/webm'});
+          const data = new FormData();
+          data.append('audio', blob, 'recording.webm');
+          status.textContent = 'Transcribing with Deepgram...';
+          try {
+            const response = await fetch('/transcribe', {method: 'POST', body: data});
+            const body = await response.json();
+            if (!response.ok) throw new Error(body.detail || 'Transcription failed');
+            transcript.value = body.transcript;
+            status.textContent = 'Transcript added.';
+          } catch (error) { status.textContent = error.message; }
+        };
+        recorder.start();
+        recordButton.disabled = true;
+        recordButton.classList.add('recording');
+        stopButton.disabled = false;
+        status.textContent = 'Recording...';
+      } catch (error) { status.textContent = 'Microphone permission is required.'; }
+    });
+
+    stopButton.addEventListener('click', () => {
+      if (recorder && recorder.state !== 'inactive') recorder.stop();
+      recordButton.disabled = false;
+      recordButton.classList.remove('recording');
+      stopButton.disabled = true;
+    });
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const data = new FormData();
@@ -112,10 +257,27 @@ def create_app(
           method: 'POST', body: data
         });
         const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || 'Consultation failed');
+        latestResponseText = body.response_text || '';
+        speakButton.hidden = !latestResponseText;
         result.textContent = JSON.stringify(body, null, 2);
       } catch (error) {
         result.textContent = 'Request failed: ' + error;
       }
+    });
+
+    speakButton.addEventListener('click', async () => {
+      speakButton.disabled = true;
+      try {
+        const data = new URLSearchParams({text: latestResponseText});
+        const response = await fetch('/speak', {method: 'POST', body: data});
+        if (!response.ok) throw new Error('Voice generation failed');
+        const audio = await response.blob();
+        audioPlayer.src = URL.createObjectURL(audio);
+        audioPlayer.hidden = false;
+        await audioPlayer.play();
+      } catch (error) { result.textContent += '\n\n' + error.message; }
+      finally { speakButton.disabled = false; }
     });
   </script>
 </body>

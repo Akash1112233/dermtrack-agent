@@ -3,10 +3,10 @@ from typing import Any
 from agents.workflow import build_consultation_graph
 from app.config import Settings, get_settings
 from database.container import Repositories, build_repositories
+from services.deepgram_service import DeepgramService
 from services.gemini_embeddings import GeminiEmbeddingService
 from services.gemini_response import GeminiResponseService
 from services.gemini_vision import GeminiVisionService
-from services.groq_service import GroqTranscriptionService
 from services.rag_retrieval import RAGRetrievalService
 from services.triage_service import SafetyTriageService
 
@@ -49,15 +49,18 @@ class ConsultationApplication:
         )
 
         if transcription_service is None:
-            transcription_service = (
-                GroqTranscriptionService(
-                    api_key=configured_settings.groq_api_key,
-                    model=(
-                        configured_settings
-                        .groq_transcription_model
-                    ),
-                )
+            transcription_service = DeepgramService(
+                api_key=configured_settings.deepgram_api_key,
+                stt_model=configured_settings.deepgram_stt_model,
+                tts_model=configured_settings.deepgram_tts_model,
             )
+
+        self.transcription_service = transcription_service
+        self.deepgram_service = (
+            transcription_service
+            if hasattr(transcription_service, "synthesize")
+            else None
+        )
 
         if vision_service is None:
             vision_service = GeminiVisionService(

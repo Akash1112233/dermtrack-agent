@@ -16,6 +16,8 @@ DermTrack Agent is a non-diagnostic dermatology-support MVP. It accepts symptom 
 - MongoDB consultation persistence
 - Patient consultation history
 - Minimal browser UI
+- Microphone recording with Deepgram transcription
+- Deepgram voice playback for generated responses
 - Automated tests
 
 ## Requirements
@@ -81,6 +83,8 @@ Expected response:
 | GET | `/health` | Service health check |
 | POST | `/consultations` | JSON text consultation |
 | POST | `/consultations/multimodal` | Multipart text and image consultation |
+| POST | `/transcribe` | Deepgram speech-to-text for recorded audio |
+| POST | `/speak` | Deepgram text-to-speech response audio |
 | GET | `/patients/{patient_id}/consultations` | Consultation history |
 | GET | `/docs` | Swagger API documentation |
 

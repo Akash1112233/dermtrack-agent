@@ -128,7 +128,7 @@ Run the complete test suite:
 uv run pytest -q
 ```
 
-The verified MVP suite currently contains 66 passing tests. A Starlette/httpx deprecation warning may appear; it does not indicate a test failure.
+The verified MVP suite currently contains 67 passing tests. A Starlette/httpx deprecation warning may appear; it does not indicate a test failure.
 
 ## Scope and safety
 

@@ -108,3 +108,37 @@ def test_multimodal_consultation_accepts_image_upload():
 
     assert fake_application.received_state is not None
     assert fake_application.received_state["image_path"]
+
+
+class FakeHistoryRepository:
+    def __init__(self):
+        self.patient_id = None
+        self.limit = None
+
+    def list_by_patient(self, patient_id, limit=20):
+        self.patient_id = patient_id
+        self.limit = limit
+        return []
+
+
+class FakeHistoryApplication(FakeApplication):
+    def __init__(self):
+        self.consultation_repository = FakeHistoryRepository()
+
+
+def test_get_patient_consultations_returns_history():
+    fake_application = FakeHistoryApplication()
+    app = create_app(application=fake_application)
+    client = TestClient(app)
+
+    response = client.get(
+        "/patients/patient_001/consultations?limit=10"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert (
+        fake_application.consultation_repository.patient_id
+        == "patient_001"
+    )
+    assert fake_application.consultation_repository.limit == 10

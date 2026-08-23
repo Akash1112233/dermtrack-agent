@@ -42,10 +42,11 @@ class ConsultationApplication:
             repositories = build_repositories(
                 settings=configured_settings
             )
-            self.repositories = repositories
-            self.consultation_repository = (
+
+        self.repositories = repositories
+        self.consultation_repository = (
             repositories.consultations
-            )
+        )
 
         if transcription_service is None:
             transcription_service = (

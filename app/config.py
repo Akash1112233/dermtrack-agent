@@ -33,6 +33,15 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     store_media_files: bool = False
+    tavily_api_key: str | None = None
+    tavily_api_url: str = "https://api.tavily.com/search"
+    tavily_enabled: bool = False
+    tavily_max_results: int = Field(default=5, ge=1, le=10)
+    tavily_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    tavily_allowed_domains: str = "aad.org,nhs.uk,medlineplus.gov,cdc.gov,who.int,bad.org.uk,nice.org.uk"
+    vector_store_backend: str = "atlas"
+    chroma_persist_directory: str = "data/chroma"
+    chroma_collection_name: str = "dermtrack_knowledge"
 
 @lru_cache
 def get_settings() -> Settings:

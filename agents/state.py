@@ -24,6 +24,8 @@ class ConsultationState(TypedDict, total=False):
     image_observations: list[ImageObservation]
     triage: TriageResult | None
     retrieved_sources: list[RetrievedSource]
+    web_retrieved_sources: list[RetrievedSource]
+    research_mode: str
     patient_history: list[Consultation]
     response_text: str
     audio_response_path: str | None
@@ -34,6 +36,7 @@ def create_initial_state(
     patient_id: str,
     consultation_id: str,
     patient_intake: PatientIntake | None = None,
+    research_mode: str = "auto",
 ) -> ConsultationState:
     """Create an empty state for a new consultation."""
     return ConsultationState(
@@ -49,6 +52,8 @@ def create_initial_state(
         image_observations=[],
         triage=None,
         retrieved_sources=[],
+        web_retrieved_sources=[],
+        research_mode=research_mode,
         patient_history=[],
         response_text="",
         audio_response_path=None,

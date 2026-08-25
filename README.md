@@ -12,7 +12,9 @@ DermTrack Agent is a non-diagnostic dermatology-support MVP. It accepts symptom 
 - Gemini Vision non-diagnostic observations
 - Conservative safety triage
 - Gemini embeddings and MongoDB Atlas Vector Search
-- Trusted knowledge ingestion and retrieval
+- Optional persistent ChromaDB vector store
+- Trusted knowledge ingestion and retrieval from Markdown, text, and PDF files
+- Optional Tavily web research with trusted-domain allowlisting
 - MongoDB consultation persistence
 - Patient consultation history
 - Minimal browser UI
@@ -125,20 +127,58 @@ The multimodal form accepts symptom onset, duration, progression, affected area,
 
 ## Adding your own RAG sources
 
-Create a UTF-8 `.txt` or `.md` file containing trusted educational or clinical-reference content. The ingestion command automatically chunks, embeds, and stores it in MongoDB:
+Create a UTF-8 `.txt`, `.md`, or `.pdf` file containing trusted educational or clinical-reference content. PDF page numbers are retained in chunk metadata. The ingestion command automatically extracts text, chunks it, creates embeddings, and stores it in the configured vector backend:
 
 ```powershell
 uv run python -m scripts.ingest_source `
     --source-id aad-eczema-guidance-2026 `
     --title "AAD eczema guidance" `
     --url "https://www.aad.org/public/diseases/eczema" `
-    --file .\data\sources\aad-eczema-guidance.md `
+    --file .\data\sources\aad-eczema-guidance.pdf `
     --source-type clinical_reference `
+    --trust-tier authoritative `
     --tag dermatology `
     --tag eczema
 ```
 
-Use authoritative sources such as government health services, recognized dermatology associations, or peer-reviewed references. Do not paste prescriptions as general guidance. The source URL and metadata are preserved with every chunk so retrieved evidence can be shown later.
+The default backend is MongoDB Atlas:
+
+```env
+VECTOR_STORE_BACKEND=atlas
+```
+
+To use local persistent ChromaDB instead:
+
+```env
+VECTOR_STORE_BACKEND=chroma
+CHROMA_PERSIST_DIRECTORY=data/chroma
+CHROMA_COLLECTION_NAME=dermtrack_knowledge
+```
+
+Chroma stores the embeddings and chunks locally. Do not commit `data/chroma`; it contains generated vector data. MongoDB remains the application system of record for consultations and source metadata.
+
+Use authoritative sources such as government health services, recognized dermatology associations, or legally available peer-reviewed references. Do not ingest prescriptions as general guidance. Preserve each source URL, publisher, version, publication date, and license/access information.
+
+## Tavily web research
+
+Tavily is disabled by default. Enable it only after adding your local key to `.env`:
+
+```env
+TAVILY_API_KEY=your_local_key
+TAVILY_ENABLED=true
+TAVILY_MAX_RESULTS=5
+TAVILY_ALLOWED_DOMAINS=aad.org,nhs.uk,medlineplus.gov,cdc.gov,who.int,bad.org.uk,nice.org.uk
+```
+
+The workflow supports three research modes:
+
+- `local_only`: use ChromaDB or Atlas only.
+- `auto`: use Tavily only when local retrieval returns no sources.
+- `local_plus_web`: explicitly permit Tavily fallback research.
+
+Web queries are built from de-identified structured observations. DermTrack does not send patient names, IDs, emails, raw transcripts, images, or prescription notes to Tavily. Retrieved web citations are passed into response generation and saved with the consultation.
+
+Tavily is a supplementary research source, not a diagnostic authority. Keep the safety-triage and non-prescriptive response rules active.
 
 ## Viewing stored data
 

@@ -20,6 +20,8 @@ htmlcov/
 data/raw/*
 data/processed/*
 data/demo/*
+data/sources/*
+data/chroma/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/demo/.gitkeep

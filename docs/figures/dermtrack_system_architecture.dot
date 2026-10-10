@@ -1,0 +1,95 @@
+digraph DermTrackArchitecture {
+    graph [
+        rankdir=TB,
+        compound=true,
+        bgcolor="white",
+        pad=0.25,
+        nodesep=0.35,
+        ranksep=0.55,
+        splines=ortho,
+        fontname="Arial"
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        color="#17365D",
+        penwidth=1.6,
+        fillcolor="#DDEBF7",
+        fontname="Arial",
+        fontsize=14,
+        fontcolor="#102A43",
+        margin="0.22,0.14"
+    ];
+
+    edge [
+        color="#6E879B",
+        penwidth=1.5,
+        arrowsize=0.75,
+        fontname="Arial",
+        fontsize=10
+    ];
+
+    user_input [label="User Input", fillcolor="#D9EAF7"];
+    patient_intake [label="Patient Intake +\nSkin Image", fillcolor="#D9EAF7"];
+    fastapi [label="FastAPI Application", fillcolor="#B9D8F5"];
+    source_response [label="Source-Grounded\nResponse", fillcolor="#D9F0E7"];
+
+    subgraph cluster_langgraph {
+        label="LangGraph Workflow";
+        color="#7CC7C9";
+        penwidth=1.8;
+        style="rounded,filled";
+        fillcolor="#EAF8F7";
+        fontname="Arial";
+        fontsize=16;
+        fontcolor="#123B4A";
+        margin=18;
+
+        gemini [label="Gemini Vision", fillcolor="#D7F0EF"];
+        rag [label="RAG Retrieval", fillcolor="#D7F0EF"];
+        tavily [label="Optional Tavily\nResearch", fillcolor="#D7F0EF"];
+        response [label="Response Generation", fillcolor="#D7F0EF"];
+
+        { rank=same; gemini; rag; }
+        { rank=same; tavily; response; }
+
+        gemini -> tavily [style=invis, weight=10];
+        rag -> response [style=invis, weight=10];
+    }
+
+    subgraph cluster_mongodb {
+        label="MongoDB Atlas";
+        color="#79A9D1";
+        penwidth=1.8;
+        style="rounded,filled";
+        fillcolor="#EDF5FC";
+        fontname="Arial";
+        fontsize=16;
+        fontcolor="#123B4A";
+        margin=18;
+
+        patient_records [label="Patient Records", fillcolor="#DDEBF7"];
+        consultation_records [label="Consultation Records", fillcolor="#DDEBF7"];
+        gridfs [label="GridFS Images", fillcolor="#DDEBF7"];
+        vector_collection [label="Vector Knowledge\nCollection", fillcolor="#DDEBF7"];
+
+        { rank=same; patient_records; consultation_records; }
+        { rank=same; gridfs; vector_collection; }
+
+        patient_records -> gridfs [style=invis, weight=10];
+        consultation_records -> vector_collection [style=invis, weight=10];
+    }
+
+    user_input -> patient_intake;
+    patient_intake -> fastapi;
+    fastapi -> gemini [lhead=cluster_langgraph];
+    fastapi -> rag [lhead=cluster_langgraph, style=dashed, constraint=false];
+    gemini -> tavily [label="optional", constraint=false];
+    tavily -> response [constraint=false];
+    rag -> response [constraint=false];
+    response -> patient_records [lhead=cluster_mongodb];
+    response -> consultation_records [lhead=cluster_mongodb, style=dashed, constraint=false];
+    gridfs -> source_response [ltail=cluster_mongodb];
+    vector_collection -> source_response [ltail=cluster_mongodb, style=dashed, constraint=false];
+}

@@ -17,7 +17,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-id", required=True)
     parser.add_argument("--title", required=True)
-    parser.add_argument("--url", required=True)
+    parser.add_argument(
+        "--url",
+        default=None,
+        help="Official source URL; omit for a local PDF citation.",
+    )
     parser.add_argument("--file", required=True, type=Path)
     parser.add_argument("--source-type", default="clinical_reference")
     parser.add_argument("--trust-tier", default="authoritative")

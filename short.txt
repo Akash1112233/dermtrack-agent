@@ -1,0 +1,103 @@
+# Presentation Speech for DermTrack Review 1
+
+## Slide 1 — Introduction
+
+Good morning everyone. Our project is called **DermTrack Agent**. It is an AI-assisted, non-diagnostic dermatology support system. The system is designed to help organize patient information, identify warning signs, retrieve trusted medical information, and provide understandable educational responses. Our team members are Annam Akash and B. Hema, under the guidance of Dr. Abhishi Choudhury.
+
+---
+
+## Slide 2 — The Gap DermTrack Addresses
+
+The main problem is that people often find it difficult to understand skin symptoms and decide what to do next. Information available online is usually scattered across many sources and may not be easy to verify. Patients may provide symptoms, medical history, and images in different formats. DermTrack aims to organize this information and provide a safer, more structured form of support.
+
+---
+
+## Slide 3 — Who Needs It and Why It Matters
+
+DermTrack is intended for two main groups: patients and clinicians. Patients can use it to provide their symptoms and receive understandable, evidence-based information. Clinicians can use the structured consultation information as additional context during review. The system is relevant because it combines patient history, optional images, and trusted medical knowledge instead of depending only on image classification.
+
+---
+
+## Slide 4 — How the Evidence Was Selected
+
+For our literature review, we studied research from four main areas. These areas are dermatology image AI, multimodal clinical AI, retrieval-augmented generation, and safety and fairness in healthcare AI. We selected papers that help us understand both the opportunities and the risks of building this type of system. This review guided our decisions about evidence retrieval, safety, privacy, and system design.
+
+---
+
+## Slide 5 — Dermatology AI: Methods and Evidence
+
+This slide presents research related to dermatology image analysis. These studies show that artificial intelligence can identify useful patterns in clinical skin images. However, they also highlight important limitations, such as dataset bias, differences in skin tones, limited generalization, and the risk of treating an AI prediction as a final diagnosis. Therefore, DermTrack uses image analysis only as a supportive observation and not as a diagnostic decision.
+
+---
+
+## Slide 6 — RAG, Clinical AI and Governance
+
+This slide covers retrieval-augmented generation, clinical language models, medical AI systems, and responsible AI guidance. Retrieval-augmented generation allows a system to retrieve information from trusted sources before producing a response. This can reduce unsupported answers, but it does not remove all risks. Our system therefore combines retrieval with citations, safety checks, human review, and clear non-diagnostic language.
+
+---
+
+## Slide 7 — What Existing Approaches Still Leave Unresolved
+
+The literature shows that many existing systems solve only one part of the problem. Some focus mainly on images and do not include symptoms or medical history. Some language models can produce fluent but unsupported medical information. Other challenges include limited skin-tone representation, the gap between benchmark testing and real-world use, and the lack of long-term consultation history. These unresolved issues form the research gap for our project.
+
+---
+
+## Slide 8 — DermTrack’s Response to the Research Gap
+
+DermTrack responds to these gaps through an integrated workflow. It accepts structured patient information, optional images, and audio input. It uses trusted local retrieval and may use limited web research when additional current information is needed. It also includes mandatory red-flag triage, privacy-minimized queries, and persistent consultation records. The overall goal is to provide organized and evidence-linked support without claiming to diagnose or prescribe.
+
+---
+
+## Slide 9 — A Bounded, Grounded, Human-Supervised Support System
+
+Our proposed solution has several layers. The input layer collects structured information, images, and audio. The reasoning layer handles transcription, image observation, safety triage, and workflow orchestration. The evidence layer retrieves information from trusted medical sources and can optionally use Tavily for additional research. The important point is that DermTrack is bounded and human-supervised. It does not replace a dermatologist or provide final medical decisions.
+
+---
+
+## Slide 10 — End-to-End Solution Workflow
+
+The workflow has six main stages. First, the system collects patient input. Second, it validates and normalizes the information, including transcribing audio. Third, it observes uploaded images when available. Fourth, it performs safety triage to identify warning signs. Fifth, it retrieves relevant evidence from trusted sources. Finally, it generates a cautious educational response and stores the consultation details. Each stage is separate, testable, and designed with safety boundaries.
+
+---
+
+## Slide 11 — Project Objectives
+
+The main objective is to build a working non-diagnostic dermatology-support prototype. The system should accept text, audio, and optional images in a structured workflow. It should perform safety triage, retrieve trusted information, and generate evidence-linked educational responses. From an engineering perspective, we also aim to implement the workflow using LangGraph, store consultation history securely, and evaluate safety, privacy, reliability, and usability.
+
+---
+
+## Slide 12 — Expected Novelty of DermTrack
+
+The expected novelty of DermTrack is the integration of several features in one safety-conscious workflow. These features include structured patient context, optional image and audio input, trusted retrieval, red-flag triage, privacy-minimized web research, and consultation history. The novelty is not a claim that the system creates a new medical diagnosis model. Instead, the contribution is a bounded and explainable support workflow that clearly states what the system can and cannot do.
+
+---
+
+## Slide 13 — Preliminary System Architecture
+
+This slide shows the preliminary architecture of DermTrack. The patient or clinician interface communicates with the FastAPI backend. LangGraph coordinates the workflow, including transcription, image observation, safety triage, evidence retrieval, response generation, and persistence. MongoDB Atlas stores structured application records, while GridFS stores uploaded image files. ChromaDB or MongoDB Atlas Vector Search can be used for medical knowledge retrieval. This is a preliminary architecture and will be refined during implementation.
+
+**If you have inserted your own architecture image, explain the components by following the arrows from the user interface to the API, then through the workflow, and finally to the storage and knowledge layers.**
+
+---
+
+## Slide 14 — Role of the Database and Data-Management Layer
+
+DermTrack separates different types of data according to their purpose. MongoDB Atlas stores structured patient intake, consultation records, transcripts, triage results, response data, and source metadata. GridFS stores large uploaded image files separately and keeps their file references in the consultation record. ChromaDB or Atlas Vector Search stores medical document chunks and embeddings for retrieval. This separation makes the system more organized, flexible, and easier to maintain.
+
+---
+
+## Slide 15 — Work Plan for the Project
+
+Our work plan follows six phases. First, we complete the requirements analysis and literature review. Second, we implement the core backend, schemas, LangGraph workflow, and safety triage. Third, we integrate the RAG system, vector search, MongoDB, and GridFS. Fourth, we connect the multimodal features and user interface. Fifth, we perform unit testing, workflow testing, safety testing, and error analysis. Finally, we complete the integration demonstration, documentation, report, and lecturer review.
+
+---
+
+## Slide 16 — Equal Technical Responsibilities
+
+We have divided the project responsibilities equally between both members. I, Annam Akash, will focus on backend APIs, LangGraph orchestration, multimodal integration, RAG, MongoDB, GridFS, and consultation history. B. Hema will focus on the interface, structured intake, response presentation, evaluation datasets, safety testing, usability, privacy, fairness, and error analysis. Both members will contribute to architecture decisions, integration testing, documentation, Git collaboration, lecturer review, and the final demonstration.
+
+---
+
+## Closing Statement
+
+To conclude, DermTrack is a research prototype that combines structured patient information, optional multimodal input, safety triage, trusted retrieval, and consultation persistence. Our focus is not to replace medical professionals, diagnose diseases, or prescribe treatment. Our focus is to create a safe, explainable, privacy-conscious, and testable support workflow for dermatology-related information and consultation organization.

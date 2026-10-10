@@ -53,7 +53,7 @@ class RetrievedSource(BaseModel):
 
     source_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
-    url: HttpUrl
+    url: HttpUrl | None = None
     similarity_score: float = Field(ge=0.0, le=1.0)
 
 
@@ -82,7 +82,7 @@ class KnowledgeDocument(BaseModel):
     title: str = Field(min_length=1)
     content: str = Field(min_length=1)
     source_type: str = Field(min_length=1)
-    url: HttpUrl
+    url: HttpUrl | None = None
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
     embedding: list[float] = Field(default_factory=list)

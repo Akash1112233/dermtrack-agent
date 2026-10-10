@@ -34,10 +34,11 @@ class ChromaVectorStore:
         metadata = {
             "title": document.title,
             "source_type": document.source_type,
-            "url": str(document.url),
             "tags": json.dumps(document.tags),
             **document.metadata,
         }
+        if document.url is not None:
+            metadata["url"] = str(document.url)
         self.collection.upsert(
             ids=[document.source_id],
             documents=[document.content],
@@ -81,7 +82,7 @@ class ChromaVectorStore:
                 title=metadata.pop("title", source_id),
                 content=content,
                 source_type=metadata.pop("source_type", "unknown"),
-                url=metadata.pop("url"),
+                url=metadata.pop("url", None),
                 tags=parsed_tags,
                 metadata={str(key): str(value) for key, value in metadata.items()},
             )

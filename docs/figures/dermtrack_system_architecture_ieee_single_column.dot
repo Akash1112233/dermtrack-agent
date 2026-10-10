@@ -1,0 +1,85 @@
+digraph DermTrackArchitectureIEEE {
+    graph [
+        rankdir=TB,
+        compound=true,
+        bgcolor="white",
+        pad=0.08,
+        nodesep=0.12,
+        ranksep=0.22,
+        ratio=compress,
+        size="3.35,9!",
+        splines=ortho,
+        fontname="Arial"
+    ];
+
+    node [
+        shape=box,
+        style="rounded,filled",
+        color="#17365D",
+        penwidth=1.1,
+        fillcolor="#DDEBF7",
+        fontname="Arial",
+        fontsize=9,
+        fontcolor="#102A43",
+        margin="0.12,0.07"
+    ];
+
+    edge [
+        color="#6E879B",
+        penwidth=1.0,
+        arrowsize=0.55
+    ];
+
+    user_input [label="User Input"];
+    patient_intake [label="Patient Intake + Skin Image"];
+    fastapi [label="FastAPI Application", fillcolor="#B9D8F5"];
+    source_response [label="Source-Grounded Response", fillcolor="#D9F0E7"];
+
+    subgraph cluster_langgraph {
+        label="LangGraph Workflow";
+        color="#7CC7C9";
+        penwidth=1.2;
+        style="rounded,filled";
+        fillcolor="#EAF8F7";
+        fontname="Arial";
+        fontsize=10;
+        fontcolor="#123B4A";
+        margin=8;
+
+        gemini [label="Gemini Vision", fillcolor="#D7F0EF"];
+        rag [label="RAG Retrieval", fillcolor="#D7F0EF"];
+        tavily [label="Optional Tavily Research", fillcolor="#D7F0EF"];
+        response [label="Response Generation", fillcolor="#D7F0EF"];
+
+        gemini -> rag;
+        rag -> tavily;
+        tavily -> response;
+    }
+
+    subgraph cluster_mongodb {
+        label="MongoDB Atlas";
+        color="#79A9D1";
+        penwidth=1.2;
+        style="rounded,filled";
+        fillcolor="#EDF5FC";
+        fontname="Arial";
+        fontsize=10;
+        fontcolor="#123B4A";
+        margin=8;
+
+        patient_records [label="Patient Records", fillcolor="#DDEBF7"];
+        consultation_records [label="Consultation Records", fillcolor="#DDEBF7"];
+        gridfs [label="GridFS Images", fillcolor="#DDEBF7"];
+        vector_collection [label="Vector Knowledge Collection", fillcolor="#DDEBF7"];
+
+        patient_records -> consultation_records;
+        consultation_records -> gridfs;
+        gridfs -> vector_collection;
+    }
+
+    user_input -> patient_intake;
+    patient_intake -> fastapi;
+    fastapi -> gemini [lhead=cluster_langgraph];
+    response -> patient_records [lhead=cluster_mongodb];
+    vector_collection -> source_response [ltail=cluster_mongodb];
+}
